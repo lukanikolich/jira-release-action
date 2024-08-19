@@ -47,6 +47,11 @@ runs:
         
         # Extract Jira issue keys from the commit messages since the base reference
         echo "Start extracting issues"
+        # Run the git log command directly
+        git log $BASE_REF..HEAD
+        # Run the grep command directly
+        git log $BASE_REF..HEAD | grep -oE "${{ inputs.jira-project-key }}-[[:digit:]]{1,}"
+
         RELATED_JIRA_ISSUES=$(git log $BASE_REF..HEAD | \
           grep -oE "${{ inputs.jira-project-key }}-[[:digit:]]{1,}" | sort | uniq | paste -sd , -)
 
