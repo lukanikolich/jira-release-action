@@ -18,7 +18,14 @@ runs:
   using: "composite"
   steps:
     - name: Fetch entire Git history (including tags)
-      run: git fetch --prune --unshallow --tags
+      run: |
+        if [ -f .git/shallow ]; then
+          echo "Repository is shallow, running git fetch --unshallow --tags"
+          git fetch --prune --unshallow --tags
+        else
+          echo "Repository is not shallow, running git fetch --tags"
+          git fetch --prune --tags
+        fi
       shell: bash
 
     - name: Determine the base reference for comparison
