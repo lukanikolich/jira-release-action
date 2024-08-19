@@ -49,6 +49,8 @@ runs:
         RELATED_JIRA_ISSUES=$(git log $BASE_REF..HEAD | \
           grep -oE "${{ inputs.jira-project-key }}-[[:digit:]]{1,}" | sort | uniq | paste -sd , -)
 
+        echo "RELATED_JIRA_ISSUES: $RELATED_JIRA_ISSUES"
+        
         # Handle empty RELATED_JIRA_ISSUES
         if [ -z "$RELATED_JIRA_ISSUES" ]; then
           echo "Warning: No Jira issues found in the commit history."
