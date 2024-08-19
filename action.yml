@@ -1,0 +1,82 @@
+name: "Jira Release Action"
+description: "Automatically creates a new Jira release and assigns relevant issues based on commit history."
+inputs:
+  jira-project-key:
+    description: "The key of the Jira project to identify related issues."
+    required: true
+  jira-automation-webhook:
+    description: "The URL of the Jira automation webhook that triggers the release creation."
+    required: true
+  build-version:
+    description: "The version identifier for the Jira release."
+    required: true
+  base-ref:
+    description: "The base reference (e.g., branch or tag) for comparing commits. Optional."
+    required: false
+
+runs:
+  using: "composite"
+  steps:
+    - name: Fetch entire Git history (including tags)
+      run: git fetch --prune --unshallow --tags
+      shell: bash
+
+    - name: Determine the base reference for comparison
+      run: |
+        export LC_ALL=en_US.utf8
+        
+        # Check if the base-ref input is provided
+        if [ -n "${{ inputs.base-ref }}" ]; then
+          echo "Base reference provided: ${{ inputs.base-ref }}"
+          
+          # Verify if the base reference exists
+          if git rev-parse --verify "${{ inputs.base-ref }}" >/dev/null 2>&1; then
+            BASE_REF="${{ inputs.base-ref }}"
+            echo "Base reference $BASE_REF exists and will be used for comparison."
+          else
+            echo "Error: The base reference ${{ inputs.base-ref }} does not exist in the repository."
+            exit 1
+          fi
+        else
+          # Use the last tag or the first commit if no base reference is provided
+          BASE_REF=$(git describe --abbrev=0 --tags 2> /dev/null || git rev-list --max-parents=0 HEAD)
+          echo "No base reference provided. Defaulting to $BASE_REF for comparison."
+        fi
+    
+        echo "Comparing commits from: $BASE_REF"
+        
+        # Extract Jira issue keys from the commit messages since the base reference
+        RELATED_JIRA_ISSUES=$(git log $BASE_REF..HEAD | \
+          grep -oE "${{ inputs.jira-project-key }}-[[:digit:]]{1,}" | sort | uniq | paste -sd , -)
+
+        # Handle empty RELATED_JIRA_ISSUES
+        if [ -z "$RELATED_JIRA_ISSUES" ]; then
+          echo "Warning: No Jira issues found in the commit history."
+          RELATED_JIRA_ISSUES=""
+        else
+          # Format issue keys for the JSON payload
+          RELATED_JIRA_ISSUES=$(echo $RELATED_JIRA_ISSUES | sed 's/[^,]*/"&"/g')
+        fi
+        echo "RELATED_JIRA_ISSUES=$RELATED_JIRA_ISSUES" >> $GITHUB_ENV
+      shell: bash
+
+    - name: Create JSON payload and invoke webhook
+      run: |
+        JSON_PAYLOAD=$(jq -n \
+          --argjson issueKeys [$RELATED_JIRA_ISSUES] \
+          --arg version "${{ inputs.build-version }}" \
+          --arg projectName "${{ inputs.jira-project-key }}" \
+          '{
+            issueKeys: $issueKeys,
+            version: $version,
+            projectName: $projectName
+          }')
+    
+        echo "Generated JSON Payload:"
+        echo "$JSON_PAYLOAD"
+    
+        # Invoke the Jira automation webhook using curl
+        curl -X POST "${{ inputs.jira-automation-webhook }}" \
+          -H "Content-Type: application/json" \
+          -d "$JSON_PAYLOAD"
+      shell: bash
