@@ -49,14 +49,13 @@ runs:
         echo "Start extracting issues"
         RELATED_JIRA_ISSUES=$(git log $BASE_REF..HEAD | grep -oE "${{ inputs.jira-project-key }}-[[:digit:]]{1,}" | sort | uniq | paste -sd , - || echo "")
 
-        echo "RELATED_JIRA_ISSUES: $RELATED_JIRA_ISSUES"
-
         # Handle empty RELATED_JIRA_ISSUES
         if [ -z "$RELATED_JIRA_ISSUES" ]; then
           echo "Warning: No Jira issues found in the commit history."
           RELATED_JIRA_ISSUES=""
         else
           # Format issue keys for the JSON payload
+          echo "Related Jira issues: $RELATED_JIRA_ISSUES"
           RELATED_JIRA_ISSUES=$(echo $RELATED_JIRA_ISSUES | sed 's/[^,]*/"&"/g')
         fi
         echo "RELATED_JIRA_ISSUES=$RELATED_JIRA_ISSUES" >> $GITHUB_ENV
