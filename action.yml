@@ -1,4 +1,4 @@
-name: "Jira Release Action"
+name: "Jira Webhook Release Action"
 description: "Automatically creates a new Jira release and assigns relevant issues based on commit history."
 inputs:
   jira-project-key:
